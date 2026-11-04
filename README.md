@@ -45,9 +45,9 @@ mern-app/
 │   ├── Dockerfile
 │   ├── .dockerignore
 │   └── ...
-├── screenshots/
+├── captures-décran-et-validation/
 │   ├── docker-images.png
-│   ├── docker-compose-up.png
+│   ├── docker-compose.png
 │   └── web-app.png
 ├── docker-compose.yml
 └── README.md
