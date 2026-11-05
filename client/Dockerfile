@@ -1,22 +1,20 @@
-FROM node:lts-alpine
-
+FROM node:lts-alpine AS build
 WORKDIR /app
 
 COPY package*.json ./
-RUN npm install
+RUN npm ci
 
 COPY . .
 
-# Variable transmise lors du build pour fixer l'URL de l'API
-ARG REACT_APP_API_URL=http://localhost:9000
-ENV REACT_APP_API_URL=$REACT_APP_API_URL
+# Définition de l'URL relative de l'API pour Nginx Proxy
+ENV REACT_APP_API_URL=/api
 
-# Build de l'application statique React
+# Construction des fichiers statiques de production
 RUN npm run build
 
-# Installation d'un serveur Web léger
-RUN npm install -g serve
+# Étape 2 : Serveur Web Nginx
+FROM nginx:alpine
+COPY --from=build /app/build /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
-EXPOSE 3000
-
-CMD ["serve", "-s", "build", "-l", "3000"]
+EXPOSE 80

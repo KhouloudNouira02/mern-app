@@ -1,116 +1,54 @@
-TP2 : Docker et Docker Compose - Application MERN
+# TP2.1 : Déploiement d'une Application MERN sur AWS ECS et ECR
 
-
----
-
-## Vue d'Ensemble
-
-Ce projet consiste en la conteneurisation et l'orchestration d'une application full-stack MERN (MongoDB, Express, React, Node.js) en utilisant Docker et Docker Compose, conformément aux spécifications du TP2.
+Ce projet présente le déploiement conteneurisé d'une application MERN (MongoDB, Express, React, Node.js) sur **AWS ECS avec AWS Fargate**, avec hébergement des images Docker sur **Amazon ECR**.
 
 ---
 
-## Table des Matières
+## Architecture du Déploiement
 
-- [Technologies Utilisées](#technologies-utilisées)
-- [Structure du Dépôt](#structure-du-dépôt)
-- [Variables d'Environnement](#variables-denvironnement)
-- [Configuration Docker](#configuration-docker)
-- [Images Docker](#images-docker)
-- [Docker Compose et Orchestration](#docker-compose-et-orchestration)
-- [Instructions d'Exécution](#instructions-dexécution)
-- [Diagnostics et Débogage](#diagnostics-et-débogage)
-- [Captures d'Écran et Validation](#captures-décran-et-validation)
+- **Frontend (Client)** : React servi par Nginx (Port 80) – image hébergée sur Amazon ECR[cite: 7].
+- **Backend (Server)** : API Express/Node.js (Port 9000) – image hébergée sur Amazon ECR[cite: 7].
+- **Base de données** : MongoDB Atlas (Connexion via String d'URI avec authentification)[cite: 9].
+- **Orchestration** : AWS ECS Cluster (`mern-cluster`) avec Fargate et révision de tâche `mern-task:6`[cite: 9, 12].
 
 ---
 
-## Technologies Utilisées
+##  Images Docker & Amazon ECR
 
-- **Frontend** : React
-- **Backend** : Node.js, Express
-- **Base de Données** : MongoDB
-- **Conteneurisation et Orchestration** : Docker, Docker Compose
+Les images Docker ont été construites localement puis publiées sur Amazon ECR (Région : `us-east-1`)[cite: 7, 10] :
+
+- **Client React (Nginx)** : `362416860691.dkr.ecr.us-east-1.amazonaws.com/mern-client:v1`[cite: 10]
+- **Serveur Express** : `362416860691.dkr.ecr.us-east-1.amazonaws.com/mern-server:v1`[cite: 10]
 
 ---
 
-## Structure du Dépôt
+##  Modifications Apportées
 
-```text
-mern-app/
-├── client/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   └── ...
-├── server/
-│   ├── Dockerfile
-│   ├── .dockerignore
-│   └── ...
-├── screenshots/
-│   ├── docker-images.png
-│   ├── docker-compose.png
-│   └── web-app.png
-├── docker-compose.yml
-└── README.md
-Variables d'Environnement
-Les variables d'environnement configurées pour l'application sont les suivantes :
+1. **`client/Dockerfile`** : Build multi-étapes Node.js vers Nginx Alpine[cite: 7].
+2. **`client/nginx.conf`** : Redirection des requêtes API `/api/` vers le backend local et gestion du routage React[cite: 7].
+3. **Variables d'environnement ECS** : Configuration sécurisée de `MONGO_URI` dans la définition de tâche `mern-task`[cite: 9, 12].
 
-REACT_APP_API_URL : Définit l'URL de l'API pour le client React afin de communiquer avec le serveur depuis le navigateur.
+---
 
-MONGO_URI : Chaîne de connexion à la base de données MongoDB utilisée par le serveur Express (mongodb://mongodb:27017/mern).
+## Difficultés Rencontrées & Solutions
 
-Configuration Docker
-Server (Express)
-Le fichier server/Dockerfile utilise l'image de base node:lts-alpine, copie les fichiers de dépendances, exécute npm install, expose le port 9000 et lance l'application via npm start.
+1. **Erreur d'authentification MongoDB (`bad auth` - Code 8000)** : 
+   - *Problème* : Incohérence initiale entre le mot de passe dans MongoDB Atlas et la variable d'environnement `MONGO_URI` dans ECS[cite: 10].
+   - *Solution* : Réinitialisation du mot de passe de l'utilisateur `khouloud` sur Atlas et mise à jour de la définition de tâche ECS vers la révision `mern-task:6`[cite: 10, 12].
 
-Client (React)
-Le fichier client/Dockerfile utilise node:lts-alpine, installe les dépendances, génère le build de production avec npm run build, utilise le serveur HTTP léger serve et expose le port 3000.
+2. **Expiration de session AWS Academy** : 
+   - *Problème* : Expiration des identifiants temporaires de session IAM entraînant un blocage du déploiement.
+   - *Solution* : Redémarrage de la session AWS Learner Lab et renouvellement du jeton de connexion AWS CLI / Docker.
 
-Images Docker
-Les images construites pour ce projet sont :
+3. **Inaccessibilité réseau sur IP privée (`100.60.75.156`)** :
+   - *Problème* : Tentative initiale d'accès via l'adresse IP privée du VPC[cite: 10].
+   - *Solution* : Récupération de l'adresse IP publique attribuée à la tâche Fargate (`54.175.19.80`)[cite: 9].
 
-Client : mern-client (construite à partir de ./client)
+---
 
-Serveur : mern-server (construite à partir de ./server)
+##  Nettoyage des Ressources
 
-Base de Données : mongo:latest
-
-Docker Compose et Orchestration
-Le fichier docker-compose.yml orchestre l'ensemble des services :
-
-mongodb : Utilise l'image officielle mongo, connectée au réseau mern-network, avec un volume nommé mern-data pour la persistance des données. Un contrôle de santé (healthcheck) est configuré pour vérifier la disponibilité de la base de données.
-
-server : Dépend de mongodb avec la condition service_healthy. Il expose le port 9000 et définit la variable MONGO_URI.
-
-client : Dépend du service server et expose le port 3000.
-
-Réseau : Un réseau de type bridge nommé mern-network assure la communication interne entre les conteneurs.
-
-Instructions d'Exécution
-Cloner le dépôt et naviguer dans le répertoire racine.
-
-Construire les images et lancer les conteneurs :
-
-Bash
-docker compose up -d --build
-Vérifier le statut des services :
-
-Bash
-docker compose ps
-Accéder à l'application web via l'URL : http://localhost:3000
-
-Diagnostics et Débogage
-Pour diagnostiquer un service en cas d'erreur au démarrage :
-
-Consulter les journaux du serveur :
-
-Bash
-docker compose logs --tail=50 server
-Consulter les journaux de la base de données :
-
-Bash
-docker compose logs --tail=50 mongodb
-Vérifier le statut d'exécution et de santé des conteneurs via docker compose ps.
-
-Captures d'Écran et Validation
-1. Images Docker construites
-2. Déploiement Docker Compose et statut Healthy
-3. Application Web et Persistance MongoDB
+Afin d'éviter toute surconsommation de crédits AWS Academy / Learner Lab :
+- Le service ECS `mern-task-service-8p06cpl2` et les tâches associées ont été arrêtés[cite: 9, 12].
+- Le cluster ECS `mern-cluster` a été nettoyé[cite: 9].
+- Les dépôts ECR `mern-client` et `mern-server` ainsi que les groupes de journaux CloudWatch ont été supprimés[cite: 10].
